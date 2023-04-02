@@ -1,0 +1,493 @@
+substitutions:
+  version: "2023.03.15"
+  device_name: "zero-surplus-dimmer"
+  shelly_url_2: "/emeter/0/power"
+
+esphome:
+  name: ${device_name}
+  build_path: ${device_name}/
+
+esp8266:
+  board: d1_mini
+  restore_from_flash: True
+
+ota:
+  password: !secret ota_password
+
+preferences:
+  flash_write_interval: 1min
+
+# Enable logging
+logger:
+  level: INFO
+
+wifi:
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+  ap:
+    ssid: "Zero surplus dimmer hotspot"
+
+captive_portal:
+
+web_server:
+  port: 80
+#  auth:
+#    username: admin
+#    password: !secret web_server_password
+
+globals:
+  - id: rsum_max
+    type: float
+    initial_value: "0.0"
+
+  - id: regul_integ
+    type: float
+
+  - id: regul_prop
+    type: float
+
+  - id: dimmer_off
+    type: bool
+
+switch:
+  - platform: template
+    name: "10 Automatic mode"
+    id: switch_router_auto
+    optimistic: True
+    restore_mode: ALWAYS_ON
+    restore_state: True
+
+number:
+  - platform: template
+    id: select_max_power
+    name: '31 Connected Load'
+    optimistic: True
+    mode: box
+    min_value: 100
+    max_value: 3000
+    step: 10
+    restore_value: True
+    initial_value: 2100
+    unit_of_measurement: "W"
+    on_value:
+      then:
+        lambda: |-
+          if (x <= id(select_dim_max_power).state)
+            id(rsum_max) = 100 * x / id(select_integ).state;
+          else
+            id(rsum_max) = 100 * id(select_dim_max_power).state / id(select_integ).state;
+          // ESP_LOGI("max_power", "rsum_max set to: %f", id(rsum_max));
+          id(regul_integ) =  id(select_integ).state / x;
+          id(regul_prop) =  id(select_prop).state / x;
+
+  - platform: template
+    id: select_integ
+    name: '32 Regul. integ.'
+    mode: box
+    min_value: 5
+    max_value: 100
+    step: 1
+    restore_value: True
+    initial_value: 60
+    optimistic: True
+    on_value:
+      then:
+        lambda: |-
+          id(regul_integ) = x / id(select_max_power).state;
+          // ESP_LOGI("integ", "regul_integ set to: %f, x=%f", id(regul_integ), x);
+          if (id(select_max_power).state <= id(select_dim_max_power).state)
+            id(rsum_max) = 100 * id(select_max_power).state / x;
+          else
+            id(rsum_max) = 100 * id(select_dim_max_power).state / x;
+          // ESP_LOGI("integ", "rsum_max set to: %f", id(rsum_max));
+
+  - platform: template
+    id: select_prop
+    name: '33 Regul. prop.'
+    mode: box
+    min_value: 5
+    max_value: 100
+    step: 1
+    restore_value: True
+    initial_value: 25
+    optimistic: True
+    on_value:
+      then:
+        lambda: |-
+          id(regul_prop) = x / id(select_max_power).state;
+          // ESP_LOGI("prop", "regul_prop set to: %f, x=%f", id(regul_prop), x);
+          // ESP_LOGI("prop", "rsum_max set to: %f", id(rsum_max));
+
+  - platform: template
+    id: select_manual_loadpercent
+    name: "12 Power in manual mode"
+    min_value: 0
+    max_value: 100
+    step: 1
+    mode: box
+    restore_value: True
+    optimistic: True
+    initial_value: 0
+    unit_of_measurement: "%"
+
+  - platform: template
+    id: select_dim_max_power
+    name: "11 Power limit in auto. mode"
+    min_value: 10
+    max_value: 3000
+    step: 10
+    mode: box
+    restore_value: True
+    optimistic: True
+    initial_value: 3000
+    unit_of_measurement: "W"
+    on_value:
+      then:
+        lambda: |-
+          if (id(select_max_power).state <= id(select_dim_max_power).state)
+            id(rsum_max) = 100 * id(select_max_power).state / id(select_integ).state;
+          else
+            id(rsum_max) = 100 * id(select_dim_max_power).state / id(select_integ).state;
+          // ESP_LOGI("dim_max", "rsum_max set to: %f", id(rsum_max));
+
+  - platform: template
+    id: ip_addr_1
+    name: '41 [ ].x.x.x'
+    optimistic: True
+    mode: box
+    min_value: 10
+    max_value: 253
+    step: 1
+    restore_value: True
+    initial_value: 192
+    on_value:
+      then:
+      - text_sensor.template.publish:
+          id: text_shelly_ip_address
+          state: !lambda |-
+            char ipaddr [16];
+            int retval = sprintf(ipaddr, "%d.%d.%d.%d",
+              static_cast<int>(x + .5),
+              static_cast<int>(id(ip_addr_2).state + .5),
+              static_cast<int>(id(ip_addr_3).state + .5),
+              static_cast<int>(id(ip_addr_4).state + .5));
+            return ipaddr;
+
+  - platform: template
+    id: ip_addr_2
+    name: '42 x.[ ].x.x'
+    optimistic: True
+    mode: box
+    min_value: 0
+    max_value: 253
+    step: 1
+    restore_value: True
+    initial_value: 168
+    on_value:
+      then:
+      - text_sensor.template.publish:
+          id: text_shelly_ip_address
+          state: !lambda |-
+            char ipaddr [16];
+            int retval = sprintf(ipaddr, "%d.%d.%d.%d",
+              static_cast<int>(id(ip_addr_1).state + .5),
+              static_cast<int>(x + .5),
+              static_cast<int>(id(ip_addr_3).state + .5),
+              static_cast<int>(id(ip_addr_4).state + .5));
+            return ipaddr;
+
+  - platform: template
+    id: ip_addr_3
+    name: '43 x.x.[ ].x'
+    optimistic: True
+    mode: box
+    min_value: 0
+    max_value: 253
+    step: 1
+    restore_value: True
+    initial_value: 54
+    on_value:
+      then:
+      - text_sensor.template.publish:
+          id: text_shelly_ip_address
+          state: !lambda |-
+            char ipaddr [16];
+            int retval = sprintf(ipaddr, "%d.%d.%d.%d",
+              static_cast<int>(id(ip_addr_1).state + .5),
+              static_cast<int>(id(ip_addr_2).state + .5),
+              static_cast<int>(x + .5),
+              static_cast<int>(id(ip_addr_4).state + .5));
+            return ipaddr;
+
+  - platform: template
+    id: ip_addr_4
+    name: '44 x.x.x.[ ]'
+    optimistic: True
+    mode: box
+    min_value: 1
+    max_value: 253
+    step: 1
+    restore_value: True
+    initial_value: 42
+    on_value:
+      then:
+      - text_sensor.template.publish:
+          id: text_shelly_ip_address
+          state: !lambda |-
+            char ipaddr [16];
+            int retval = sprintf(ipaddr, "%d.%d.%d.%d",
+              static_cast<int>(id(ip_addr_1).state + .5),
+              static_cast<int>(id(ip_addr_2).state + .5),
+              static_cast<int>(id(ip_addr_3).state + .5),
+              static_cast<int>(x + .5));
+            return ipaddr;
+
+sensor:
+  - platform: template
+    name: "21 Grid power"
+    id: sensor_grid_power
+    unit_of_measurement: "W"
+    accuracy_decimals: 0
+    update_interval: 1h
+
+  - platform: template
+    name: "22 Dimmer power (estim.)"
+    id: sensor_dim_power_estim
+    unit_of_measurement: "W"
+    accuracy_decimals: 0
+    update_interval: 1h
+
+  - platform: template
+    id: sensor_dimmer_percent
+    name: '23 Dimmer percent'
+    unit_of_measurement: "%"
+    filters:
+      - filter_out: NAN
+      - calibrate_polynomial:
+          degree: 3
+          datapoints:
+            - 0.0 -> 0.0
+            - 5.0 -> 8.3
+            - 10.0 -> 14.0
+            - 20.0 -> 23.5
+            - 30.0 -> 32.0
+            - 40.0 -> 41.0
+            - 50.0 -> 50.0
+            - 60.0 -> 58.0
+            - 70.0 -> 67.0
+            - 80.0 -> 75.0
+            - 90.0 -> 85.0
+            - 100.0 -> 100.0
+    on_raw_value:
+      then:
+        - globals.set:
+            id: dimmer_off
+            value: !lambda |-
+              return x < 0.1;
+        - sensor.template.publish:
+            id: sensor_dim_power_estim
+            state: !lambda |-
+              if (isnan(x))
+                return NAN;
+              else
+                return x * id(select_max_power).state / 100.0;
+    on_value:
+      then:
+        - light.turn_on:
+            id: waterheater_dimmer
+            brightness: !lambda |-
+              if (id(dimmer_off)) return 0.0;
+              else return x / 100.0;
+ 
+  - platform: wifi_signal
+    name: "53 rssi"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "Uptime Sensor"
+    id: uptime_sensor
+    update_interval: 60s
+    internal: True
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: uptime_human
+            state: !lambda |-
+              int seconds = round(id(uptime_sensor).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              return (
+                (days ? String(days) + "d " : "") +
+                (hours ? String(hours) + "h " : "") +
+                (minutes ? String(minutes) + "m" : "")
+              ).c_str();
+
+text_sensor:
+  - platform: template
+    id: text_shelly_ip_address
+    name: "40 Shelly EM IP address"
+
+  - platform: template
+    name: "52 Uptime"
+    id: uptime_human
+    icon: mdi:clock-start
+
+  - platform: wifi_info
+    ip_address:
+      name: "54 ESP IP Address"
+    mac_address:
+      name: "55 ESP MAC Address"
+
+  - platform: template
+    name: "20 === Realtime"
+    id: text_realtime
+
+  - platform: template
+    name: "30 === Settings"
+    id: text_settings
+
+  - platform: template
+    name: "50 === About"
+    id: text_about
+#    lambda: |-
+#      return {"v. ${version}"};
+
+  - platform: template
+    name: "51 Version"
+    lambda: |-
+      return {"${version}"};
+
+output:
+  - platform: ac_dimmer
+    id: dimmer1
+    gate_pin: GPIO16 #D0
+    # method: leading pulse # by default
+    zero_cross_pin:
+      number: GPIO14 #D5
+      mode: INPUT
+      inverted: no
+    max_power: 100%
+    min_power: 5%
+
+light:
+  - platform: monochromatic
+    output: dimmer1
+    name: "32 Waterheater Dimmer"
+    id: waterheater_dimmer
+    default_transition_length: 0s
+    gamma_correct: 1.0
+    restore_mode: ALWAYS_OFF
+    internal: True
+  
+http_request:
+  id: http_request_shelly
+  useragent: esphome/device
+  timeout: 500ms
+  esp8266_disable_ssl_support: True
+
+interval:
+  - interval: 2sec
+    then:
+      if:
+        condition:
+          wifi.connected:
+        then:
+          if:
+            condition:
+              switch.is_on: switch_router_auto
+            then: # switch in automatic mode
+            - http_request.get:
+                url: !lambda |-
+                  return "http://" + id(text_shelly_ip_address).state + "${shelly_url_2}";
+                headers:
+                  Content-Type: application/json
+                verify_ssl: false
+                on_response:
+                  then:
+                    - lambda: |-
+                        // make gridpower HTTP request and check result
+                        static int gridpower_err_count = 0;
+                        const int gridpower_err_count_max = 10;
+                        if (status_code == 200) {
+                          if (gridpower_err_count > gridpower_err_count_max) ESP_LOGI("gridpower", "Got value");
+                          gridpower_err_count = 0;
+                          json::parse_json(id(http_request_shelly).get_string(), [](JsonObject root) {
+                            id(sensor_grid_power).publish_state(root["power"]);
+                          });
+                        }
+                        else {
+                          // ESP_LOGW("http", "HTTP request failed. status = %d", status_code);
+                          if (gridpower_err_count > gridpower_err_count_max) {
+                            id(sensor_grid_power).publish_state(NAN);
+                            auto setdim = id(waterheater_dimmer).turn_off();
+                            setdim.perform();
+                            ESP_LOGW("gridpower", "No measurement. Dimmer switched off.");
+                          }
+                          else {
+                            gridpower_err_count += 1;
+                            return;
+                          }
+                        }
+                        // regulation
+                        float _loadpercent;
+                        if (isnan(id(sensor_grid_power).state)) return;
+                        static float _routersum = 0.;
+                        float diff = -id(sensor_grid_power).state;
+                        _routersum += diff;
+                        float _rsummax;
+                        if (id(select_dim_max_power).state >= id(select_max_power).state)
+                          _rsummax = id(rsum_max);
+                        else
+                          _rsummax = id(rsum_max) - diff * id(regul_prop) / id(regul_integ);
+                        if (_routersum < -100.) _routersum = -100.;
+                        // do not let _routersum grow further than necessary for 100% load
+                        if (_routersum > _rsummax) _routersum = _rsummax;
+                        float pDiff = diff * id(regul_prop);
+                        float iDiff = _routersum * id(regul_integ);
+                        _loadpercent = pDiff + iDiff;
+                        if (_loadpercent < 0.) _loadpercent = 0.;
+                        if (_loadpercent > 100.) _loadpercent = 100.;
+                        id(sensor_dimmer_percent).publish_state(_loadpercent);
+                        // auto setdim = id(waterheater_dimmer).turn_on();
+                        // setdim.set_brightness(_loadpercent/100.); // 1.0 is full brightness
+                        // setdim.perform();
+                        // id(sensor_dim_power_estim).publish_state(_loadpercent * id(select_max_power).state / 100.);
+            else: # switch in manual mode
+            - sensor.template.publish:
+                id: sensor_grid_power
+                state: NaN
+            - if:
+                condition:
+                  lambda: |-
+                    const bool calibration_mode = false;
+                    return not calibration_mode;
+                then: # in normal mode
+                - sensor.template.publish:
+                    id: sensor_dimmer_percent
+                    state: !lambda |-
+                      return id(select_manual_loadpercent).state;
+                else: # in calibration mode
+                - light.turn_on:
+                    id: waterheater_dimmer
+                    brightness: !lambda |-
+                      return id(select_manual_loadpercent).state / 100.;
+#                - sensor.template.publish:
+#                    id: sensor_dim_power_estim
+#                    state: !lambda |-
+#                      return id(select_manual_loadpercent).state * id(select_max_power).state / 100.0;
+                - sensor.template.publish:
+                    id: sensor_dimmer_percent
+                    state: !lambda |-
+                      return NAN;
+        else:
+          logger.log: "WiFi not connected"
+
+button:
+  - platform: safe_mode
+    name: "61 Restart (Safe Mode)"
+
+  - platform: restart
+    name: "60 Restart"
