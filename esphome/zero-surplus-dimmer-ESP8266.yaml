@@ -1,7 +1,12 @@
+# I/O connections
+# gate_pin: GPIO16 (D0)
+# zero_cross_pin: GPIO14 (D5)
+
 substitutions:
-  version: "2023.03.15"
+  version: "2023.06.05"
   device_name: "zero-surplus-dimmer"
   shelly_url_2: "/emeter/0/power"
+  shelly_http_request_timeout: "500ms"
 
 esphome:
   name: ${device_name}
@@ -12,7 +17,7 @@ esp8266:
   restore_from_flash: True
 
 ota:
-  password: !secret ota_password
+#  password: !secret ota_password
 
 preferences:
   flash_write_interval: 1min
@@ -49,6 +54,9 @@ globals:
   - id: dimmer_off
     type: bool
 
+  - id: shelly_url
+    type: std::string
+
 switch:
   - platform: template
     name: "10 Automatic mode"
@@ -76,7 +84,6 @@ number:
             id(rsum_max) = 100 * x / id(select_integ).state;
           else
             id(rsum_max) = 100 * id(select_dim_max_power).state / id(select_integ).state;
-          // ESP_LOGI("max_power", "rsum_max set to: %f", id(rsum_max));
           id(regul_integ) =  id(select_integ).state / x;
           id(regul_prop) =  id(select_prop).state / x;
 
@@ -94,12 +101,10 @@ number:
       then:
         lambda: |-
           id(regul_integ) = x / id(select_max_power).state;
-          // ESP_LOGI("integ", "regul_integ set to: %f, x=%f", id(regul_integ), x);
           if (id(select_max_power).state <= id(select_dim_max_power).state)
             id(rsum_max) = 100 * id(select_max_power).state / x;
           else
             id(rsum_max) = 100 * id(select_dim_max_power).state / x;
-          // ESP_LOGI("integ", "rsum_max set to: %f", id(rsum_max));
 
   - platform: template
     id: select_prop
@@ -109,14 +114,12 @@ number:
     max_value: 100
     step: 1
     restore_value: True
-    initial_value: 25
+    initial_value: 15
     optimistic: True
     on_value:
       then:
         lambda: |-
           id(regul_prop) = x / id(select_max_power).state;
-          // ESP_LOGI("prop", "regul_prop set to: %f, x=%f", id(regul_prop), x);
-          // ESP_LOGI("prop", "rsum_max set to: %f", id(rsum_max));
 
   - platform: template
     id: select_manual_loadpercent
@@ -148,7 +151,6 @@ number:
             id(rsum_max) = 100 * id(select_max_power).state / id(select_integ).state;
           else
             id(rsum_max) = 100 * id(select_dim_max_power).state / id(select_integ).state;
-          // ESP_LOGI("dim_max", "rsum_max set to: %f", id(rsum_max));
 
   - platform: template
     id: ip_addr_1
@@ -171,6 +173,8 @@ number:
               static_cast<int>(id(ip_addr_2).state + .5),
               static_cast<int>(id(ip_addr_3).state + .5),
               static_cast<int>(id(ip_addr_4).state + .5));
+            std::string strIpAddr(ipaddr);
+            id(shelly_url) = "http://" + strIpAddr + "${shelly_url_2}";
             return ipaddr;
 
   - platform: template
@@ -194,6 +198,8 @@ number:
               static_cast<int>(x + .5),
               static_cast<int>(id(ip_addr_3).state + .5),
               static_cast<int>(id(ip_addr_4).state + .5));
+            std::string strIpAddr(ipaddr);
+            id(shelly_url) = "http://" + strIpAddr + "${shelly_url_2}";
             return ipaddr;
 
   - platform: template
@@ -205,7 +211,7 @@ number:
     max_value: 253
     step: 1
     restore_value: True
-    initial_value: 54
+    initial_value: 1
     on_value:
       then:
       - text_sensor.template.publish:
@@ -217,6 +223,8 @@ number:
               static_cast<int>(id(ip_addr_2).state + .5),
               static_cast<int>(x + .5),
               static_cast<int>(id(ip_addr_4).state + .5));
+            std::string strIpAddr(ipaddr);
+            id(shelly_url) = "http://" + strIpAddr + "${shelly_url_2}";
             return ipaddr;
 
   - platform: template
@@ -228,7 +236,7 @@ number:
     max_value: 253
     step: 1
     restore_value: True
-    initial_value: 42
+    initial_value: 100
     on_value:
       then:
       - text_sensor.template.publish:
@@ -240,6 +248,8 @@ number:
               static_cast<int>(id(ip_addr_2).state + .5),
               static_cast<int>(id(ip_addr_3).state + .5),
               static_cast<int>(x + .5));
+            std::string strIpAddr(ipaddr);
+            id(shelly_url) = "http://" + strIpAddr + "${shelly_url_2}";
             return ipaddr;
 
 sensor:
@@ -385,7 +395,7 @@ light:
 http_request:
   id: http_request_shelly
   useragent: esphome/device
-  timeout: 500ms
+  timeout: ${shelly_http_request_timeout}
   esp8266_disable_ssl_support: True
 
 interval:
@@ -400,8 +410,7 @@ interval:
               switch.is_on: switch_router_auto
             then: # switch in automatic mode
             - http_request.get:
-                url: !lambda |-
-                  return "http://" + id(text_shelly_ip_address).state + "${shelly_url_2}";
+                url: !lambda "return id(shelly_url);"
                 headers:
                   Content-Type: application/json
                 verify_ssl: false
@@ -425,6 +434,7 @@ interval:
                             auto setdim = id(waterheater_dimmer).turn_off();
                             setdim.perform();
                             ESP_LOGW("gridpower", "No measurement. Dimmer switched off.");
+                            return;
                           }
                           else {
                             gridpower_err_count += 1;
