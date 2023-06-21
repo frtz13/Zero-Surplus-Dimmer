@@ -44,9 +44,9 @@ When the energy flow is positive, meaning the household consumes energy, the Rob
 
 - Assemble the dimmer, according to the schematics in this repository. A 35x35x10mm 5V fan should fit between the radiator and the screw terminals of the dimmer board.
   
-  ![y.](./img/dimmer-esp32c3.jpg)
+  ![Dimmer assembly](./img/Dimmer-ESP32C3.jpg)
   
-  ![s](./img/Dimmer-bimetal.jpg)
+  ![Dimmer detail: bimetal switch, thermal fuse](./img/Dimmer-bimetal.jpg)
 
 - Download the binary, or compile it yourself with ESPHome.
 
