@@ -3,11 +3,11 @@
 # Zero crossing: GPIO3
 
 substitutions:
-  version: "2023.06.05"
+  version: "2024.01.14"
   device_name: "zero-surplus-dimmer32"
   shelly_url_2: "/emeter/0/power"
   shelly_http_request_timeout: "1s"
-# 2023.5.5: timeouts less than 1s do not work for the ESP32 (issue #4459)
+# 2023.5.5: timeouts less than 1s do not work for the ESP32 (issue #4459), was 1s
 
 esphome:
   name: ${device_name}
@@ -28,6 +28,8 @@ preferences:
 # Enable logging
 logger:
   level: INFO
+  logs:
+    component: ERROR # avoid warnings for HTTP requests taking too much time
 
 wifi:
 #  ssid: !secret wifi_ssid
@@ -66,8 +68,7 @@ switch:
     name: "10 Automatic mode"
     id: switch_router_auto
     optimistic: True
-    restore_mode: ALWAYS_ON
-    restore_state: True
+    restore_mode: RESTORE_DEFAULT_ON
 
 number:
   - platform: template
