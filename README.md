@@ -40,7 +40,8 @@ When the energy flow is positive, meaning the household consumes energy, the Rob
 
 #### The Dimmer
 
-- Make a choice for the micro-controller, either a ESP32-C3 or a ESP8266. Both should work, but if you have to order one anyway, I'd recommend the ESP32-C3. For the ESP32-C3, an ESP32-C3-Mini development board works fine. For the ESP8266, a D1-Mini board works fine.
+- Make a choice for the micro-controller. I'd recommend the ESP32-C3. For the ESP32-C3, an ESP32-C3-Mini development board works fine.
+  It should also be possible to use an ESP8266. You'll find the corresponding YAML code in this repository, but this code is no longer maintained.
 
 - Assemble the dimmer, according to the schematics in this repository. A 35x35x10mm 5V fan should fit between the radiator and the screw terminals of the dimmer board.
   
@@ -50,11 +51,11 @@ When the energy flow is positive, meaning the household consumes energy, the Rob
 
 - Download the binary, or compile it yourself with ESPHome.
 
-- Flash the ESPHome binary to the ESP32-C3 or ESP8266. Either use the ESPHome tools, or the  [NodeMCU-PyFlasher]([Releases · marcelstoer/nodemcu-pyflasher · GitHub](https://github.com/marcelstoer/nodemcu-pyflasher/releases)). In this procedure, you should completely erase the ESP flash memory.
+- Flash the ESPHome binary to the microcontroller. Either use the ESPHome tools, or the  [NodeMCU-PyFlasher]([Releases · marcelstoer/nodemcu-pyflasher · GitHub](https://github.com/marcelstoer/nodemcu-pyflasher/releases)). In this procedure, you should completely erase the ESP flash memory.
 
 - Power on the dimmer. Connect your smartphone to the WiFi hotspot of the dimmer, then navigate to the IP address 192.168.4.1. Select your wireless network and enter its password.
 
-- When the dimmer reboots, it should connect to your wireless network. Now you will need to find out the IP Address it has been assigned in your wireless network (using the same procedure as above, with the Shelly EM.
+- When the dimmer reboots, it should connect to your wireless network. Now you will need to find out the IP Address it has been assigned in your wireless network (using the same procedure as above, with the Shelly EM).
 
 - Once you found the IP address of the dimmer, use a browser to connect to its web interface.
 

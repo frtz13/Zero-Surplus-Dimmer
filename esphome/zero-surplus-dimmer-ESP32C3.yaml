@@ -3,7 +3,7 @@
 # Zero crossing: GPIO3
 
 substitutions:
-  version: "2024.01.14"
+  version: "2024.07.09"
   device_name: "zero-surplus-dimmer32"
   shelly_url_2: "/emeter/0/power"
   shelly_http_request_timeout: "1s"
@@ -21,6 +21,7 @@ esp32:
 
 ota:
 #  password: !secret ota_password
+  platform: esphome
 
 preferences:
   flash_write_interval: 1min
@@ -41,6 +42,7 @@ captive_portal:
 
 web_server:
   port: 80
+  local: True
 #  auth:
 #    username: admin
 #    password: !secret web_server_password
@@ -409,6 +411,7 @@ http_request:
   id: http_request_shelly
   useragent: esphome/device
   timeout: ${shelly_http_request_timeout}
+  verify_ssl: false
 
 interval:
   - interval: 2sec
@@ -423,25 +426,25 @@ interval:
             then: # switch in automatic mode
             - http_request.get:
                 url: !lambda "return id(shelly_url);"
+                capture_response: true
                 headers:
                   Content-Type: application/json
-                verify_ssl: false
                 on_response:
                   then:
                     - lambda: |-
                         // make gridpower HTTP request and check result
                         static int gridpower_err_count = 0;
                         const int gridpower_err_count_max = 10;
-                        if (status_code == 200) {
+                        if (response->status_code == 200) {
                           if (gridpower_err_count > gridpower_err_count_max) ESP_LOGI("gridpower", "Got value");
                           gridpower_err_count = 0;
-                          auto grid = id(http_request_shelly).get_string();
-                          json::parse_json(grid, [](JsonObject root) {
+                          json::parse_json(body, [](JsonObject root) -> bool {
                             id(sensor_grid_power).publish_state(root["power"]);
+                            return true;
                           });
                         }
                         else {
-                          ESP_LOGW("http", "HTTP request failed. status = %d", status_code);
+                          ESP_LOGW("http", "HTTP request failed. status = %d", response->status_code);
                           if (gridpower_err_count > gridpower_err_count_max) {
                             id(sensor_grid_power).publish_state(NAN);
                             auto setdim = id(waterheater_dimmer).turn_off();
@@ -511,6 +514,6 @@ button:
   - platform: restart
     name: "60 Restart"
 
+  - platform: factory_reset
+    name: "62 Factory reset"
 # adding this button makes it easier to return to factory settings
-#  - platform: factory_reset
-#    name: "62 Restart with Factory Default Settings"
