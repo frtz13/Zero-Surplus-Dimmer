@@ -40,8 +40,8 @@ When the energy flow is positive, meaning the household consumes energy, the Rob
 
 #### The Dimmer
 
-- Make a choice for the micro-controller. I'd recommend the ESP32-C3. For the ESP32-C3, an ESP32-C3-Mini development board works fine.
-  It should also be possible to use an ESP8266. You'll find the corresponding YAML code in this repository, but this code is no longer maintained.
+- Make a choice for the micro-controller. I'd recommend the ESP32-C3. An ESP32-C3-Mini development board works fine.
+  It should also be possible to use an ESP8266. You'll find the corresponding YAML code in this repository.
 
 - Assemble the dimmer, according to the schematics in this repository. A 35x35x10mm 5V fan should fit between the radiator and the screw terminals of the dimmer board.
   

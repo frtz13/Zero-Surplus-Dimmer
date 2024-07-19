@@ -1,6 +1,8 @@
+zero-surplus-dimmer v. 2024.07.19
+	minor edits in  ESP8266 ESPHome code, so that it compiles with recent ESPHome versions (currently 2024.7.0).
+
 zero-surplus-dimmer v. 2024.07.09
 	minor edits in  ESP32C3 ESPHome code, so that it compiles with recent ESPHome versions (currently 2024.6.6).
-	ESP8266 code is no longer maintained.
 
 zero-surplus-dimmer v. 2024.01.14
 	minor edits in  ESP32C3 ESPHome code (avoid deprecated functions, remove warnings about http request delays)

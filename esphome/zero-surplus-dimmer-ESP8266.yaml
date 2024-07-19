@@ -3,7 +3,7 @@
 # zero_cross_pin: GPIO14 (D5)
 
 substitutions:
-  version: "2023.06.05"
+  version: "2024.07.19"
   device_name: "zero-surplus-dimmer"
   shelly_url_2: "/emeter/0/power"
   shelly_http_request_timeout: "500ms"
@@ -18,6 +18,7 @@ esp8266:
 
 ota:
 #  password: !secret ota_password
+  platform: esphome
 
 preferences:
   flash_write_interval: 1min
@@ -62,8 +63,7 @@ switch:
     name: "10 Automatic mode"
     id: switch_router_auto
     optimistic: True
-    restore_mode: ALWAYS_ON
-    restore_state: True
+    restore_mode: RESTORE_DEFAULT_ON
 
 number:
   - platform: template
@@ -397,7 +397,7 @@ http_request:
   useragent: esphome/device
   timeout: ${shelly_http_request_timeout}
   esp8266_disable_ssl_support: True
-
+  
 interval:
   - interval: 2sec
     then:
@@ -411,20 +411,21 @@ interval:
             then: # switch in automatic mode
             - http_request.get:
                 url: !lambda "return id(shelly_url);"
+                capture_response: true
                 headers:
                   Content-Type: application/json
-                verify_ssl: false
                 on_response:
                   then:
                     - lambda: |-
                         // make gridpower HTTP request and check result
                         static int gridpower_err_count = 0;
                         const int gridpower_err_count_max = 10;
-                        if (status_code == 200) {
+                        if (response->status_code == 200) {
                           if (gridpower_err_count > gridpower_err_count_max) ESP_LOGI("gridpower", "Got value");
                           gridpower_err_count = 0;
-                          json::parse_json(id(http_request_shelly).get_string(), [](JsonObject root) {
+                          json::parse_json(body, [](JsonObject root) -> bool {
                             id(sensor_grid_power).publish_state(root["power"]);
+                            return true;
                           });
                         }
                         else {
@@ -501,3 +502,6 @@ button:
 
   - platform: restart
     name: "60 Restart"
+
+  - platform: factory_reset
+    name: "62 Factory reset"
